@@ -423,6 +423,8 @@ codeunit 8751 "DA External Storage Impl." implements "File Scenario"
     procedure DeleteFromInternalStorage(var DocumentAttachment: Record "Document Attachment"): Boolean
     var
         TenantMedia: Record "Tenant Media";
+    // RED RUN: the fix below is commented out so the new tests reproduce the original defect.
+    // OtherDocumentAttachment: Record "Document Attachment";
     begin
         // Validate input parameters
         if not DocumentAttachment."Document Reference ID".HasValue() then
@@ -432,16 +434,18 @@ codeunit 8751 "DA External Storage Impl." implements "File Scenario"
         if not DocumentAttachment."Stored Externally" then
             exit(false);
 
-        // Delete from Tenant Media
-        if TenantMedia.Get(DocumentAttachment."Document Reference ID".MediaId()) then begin
+        // Tenant Media is shared storage. Copied attachments reference the same media, because
+        // Document Attachment Mgmt copies the media reference itself. Deleting it while another
+        // attachment still points at it would leave that attachment without any content.
+        // Uses key "Document Reference ID".
+        // OtherDocumentAttachment.SetRange("Document Reference ID", DocumentAttachment."Document Reference ID");
+        // if OtherDocumentAttachment.Count() <= 1 then
+        if TenantMedia.Get(DocumentAttachment."Document Reference ID".MediaId()) then
             TenantMedia.Delete();
 
-            // Mark Document Attachment as Not Stored Internally
-            DocumentAttachment.MarkAsDeletedInternally();
-            exit(true);
-        end;
-
-        exit(false);
+        // Mark Document Attachment as Not Stored Internally
+        DocumentAttachment.MarkAsDeletedInternally();
+        exit(true);
     end;
 
     /// <summary>
